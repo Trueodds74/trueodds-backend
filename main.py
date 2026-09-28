@@ -67,4 +67,4 @@ def get_fixtures():
                 "date": match['fixture']['date']
             })
             
-    return {"upcoming_matches":fixtures}
+    return data
