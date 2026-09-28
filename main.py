@@ -48,3 +48,22 @@ def test_keys():
         "football_api": "Ready" if API_FOOTBALL_KEY else "Missing",
         "odds_api": "Ready" if ODDS_API_KEY else "Missing"
     }
+
+@app.get("/fixtures")
+def get_fixtures():
+    url = "https://v3.football.api-sports.io/fixtures?league=39&next=5"
+    headers = {"x-apisports-key": API_FOOTBALL_KEY}
+    
+    response = requests.get(url, headers=headers)
+    data = response.json()
+    
+    fixtures = []
+    if data.get('response'):
+        for match in data['response']:
+            fixtures.append({
+                "home": match['teams']['home']['name'],
+                "away": match['teams']['away']['name'],
+                "date": match['fixture']['date']
+            })
+            
+    return {"upcoming_matches": fixtures}
