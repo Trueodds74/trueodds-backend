@@ -52,7 +52,7 @@ def test_keys():
 
 @app.get("/fixtures")
 def get_fixtures():
-    url = "https://v3.football.api-sports.io/fixtures?league=39&last=5&season=2026"
+    url = "https://v3.football.api-sports.io/fixtures?league=39&last=5&season=2024"
     headers = {"x-apisports-key": API_FOOTBALL_KEY}
     
     response = requests.get(url, headers=headers)
@@ -67,4 +67,4 @@ def get_fixtures():
                 "date": match['fixture']['date']
             })
             
-    return data
+    return {"upcoming_matches":fixtures}
