@@ -52,7 +52,7 @@ def test_keys():
 
 @app.get("/fixtures")
 def get_fixtures():
-    url = "https://v3.football.api-sports.io/fixtures?league=39&next=5"
+    url = "https://v3.football.api-sports.io/fixtures?league=39&next=5&season=2026"
     headers = {"x-apisports-key": API_FOOTBALL_KEY}
     
     response = requests.get(url, headers=headers)
