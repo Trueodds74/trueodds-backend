@@ -64,12 +64,12 @@ def get_fixtures():
             fixtures.append({
                 "home": match['teams']['home']['name'],
                 "away": match['teams']['away']['name'],
-                "date": match['fixtures']['date']
+                "date": match['fixture']['date']
             })
             
-    return {"upcoming_matches":fixture]
+    return {"upcoming_matches":fixtures]
 
-    @app.get("/odds")
+@app.get("/odds")
 def get_odds():
     url = f"https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey={ODDS_API_KEY}&regions=uk&markets=h2h&oddsFormat=decimal"
     
