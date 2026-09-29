@@ -64,7 +64,7 @@ def get_fixtures():
             fixtures.append({
                 "home": match['teams']['home']['name'],
                 "away": match['teams']['away']['name'],
-                "date": match['fixture']['date']
+                "date": match['fixtures']['date']
             })
             
     return {"upcoming_matches":fixture]
