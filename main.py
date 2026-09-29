@@ -163,3 +163,58 @@ def get_odds(sport: str = "soccer_epl"):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
             detail=f"External request failed: {str(e)}"
         )
+
+@app.get("/value-bets")
+def get_value_bets():
+    # 1. Get the raw data from the Odds API
+    url = "https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey=" + ODDS_API_KEY + "&regions=uk&markets=h2h&oddsFormat=decimal"
+    response = requests.get(url)
+    matches = response.json()
+
+    value_bets = []
+
+    # 2. Loop through every match
+    for match in matches:
+        home_team = match['home_team']
+        away_team = match['away_team']
+
+        # We start with 0 odds and look for higher ones
+        best_home_odd = 0
+        best_home_bookie = ""
+        best_away_odd = 0
+        best_away_bookie = ""
+        best_draw_odd = 0
+        best_draw_bookie = ""
+
+        # 3. Look at every bookmaker for this match
+        for bookie in match.get('bookmakers', []):
+            for market in bookie.get('markets', []):
+                if market['key'] == 'h2h': 
+                    for outcome in market['outcomes']:
+                        name = outcome['name']
+                        price = outcome['price']
+
+                        # Check if this is the best price for Home Team
+                        if name == home_team and price > best_home_odd:
+                            best_home_odd = price
+                            best_home_bookie = bookie['title']
+
+                        # Check if this is the best price for Away Team
+                        elif name == away_team and price > best_away_odd:
+                            best_away_odd = price
+                            best_away_bookie = bookie['title']
+
+                        # Check if this is the best price for a Draw
+                        elif name == 'Draw' and price > best_draw_odd:
+                            best_draw_odd = price
+                            best_draw_bookie = bookie['title']
+
+        # 4. Save the best finds for this match
+        value_bets.append({
+            "match": f"{home_team} vs {away_team}",
+            "best_home_win": {"odd": best_home_odd, "bookmaker": best_home_bookie},
+            "best_away_win": {"odd": best_away_odd, "bookmaker": best_away_bookie},
+            "best_draw": {"odd": best_draw_odd, "bookmaker": best_draw_bookie}
+        })
+
+    return {"total_value_bets": len(value_bets), "value_bets": value_bets}
