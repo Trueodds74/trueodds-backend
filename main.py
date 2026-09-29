@@ -218,3 +218,69 @@ def get_value_bets():
         })
 
     return {"total_value_bets": len(value_bets), "value_bets": value_bets}
+
+@app.get("/true-odds")
+def get_true_odds():
+    url = "https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey=" + ODDS_API_KEY + "&regions=uk&markets=h2h&oddsFormat=decimal"
+    response = requests.get(url)
+    matches = response.json()
+
+    true_value_bets = []
+
+    for match in matches:
+        home_team = match['home_team']
+        away_team = match['away_team']
+
+        home_odds = []
+        draw_odds = []
+        away_odds = []
+
+        # 1. Collect all odds from all bookies
+        for bookie in match.get('bookmakers', []):
+            for market in bookie.get('markets', []):
+                if market['key'] == 'h2h':
+                    for outcome in market['outcomes']:
+                        if outcome['name'] == home_team:
+                            home_odds.append(outcome['price'])
+                        elif outcome['name'] == 'Draw':
+                            draw_odds.append(outcome['price'])
+                        elif outcome['name'] == away_team:
+                            away_odds.append(outcome['price'])
+
+        # 2. Calculate the "True Odds" (Market Average without margin)
+        def calc_true_odds(odds_list):
+            if not odds_list: return 0
+            avg_prob = sum(1/o for o in odds_list) / len(odds_list)
+            return round(1 / avg_prob, 2)
+
+        true_home = calc_true_odds(home_odds)
+        true_draw = calc_true_odds(draw_odds)
+        true_away = calc_true_odds(away_odds)
+
+        # 3. Find Value Bets (Where Bookie Odds > True Odds)
+        def find_value(odds_list, true_odd):
+            best_value = None
+            for o in odds_list:
+                if o > true_odd:
+                    value_pct = round(((o / true_odd) - 1) * 100, 1)
+                    if best_value is None or o > best_value['odd']:
+                        best_value = {'odd': o, 'value_percent': f"+{value_pct}%"}
+            return best_value
+
+        home_value = find_value(home_odds, true_home)
+        draw_value = find_value(draw_odds, true_draw)
+        away_value = find_value(away_odds, true_away)
+
+        # 4. Only show matches that actually have a Value Bet
+        if home_value or draw_value or away_value:
+            true_value_bets.append({
+                "match": f"{home_team} vs {away_team}",
+                "true_odds": {"home": true_home, "draw": true_draw, "away": true_away},
+                "value_bets": {
+                    "home_win": home_value,
+                    "draw": draw_value,
+                    "away_win": away_value
+                }
+            })
+
+    return {"total_true_value_bets": len(true_value_bets), "true_value_bets": true_value_bets}
