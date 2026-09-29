@@ -68,3 +68,12 @@ def get_fixtures():
             })
             
     return {"upcoming_matches":fixture]
+
+            @app.get("/odds")
+def get_odds():
+    url = f"https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?apiKey={ODDS_API_KEY}&regions=uk&markets=h2h&oddsFormat=decimal"
+    
+    response = requests.get(url)
+    data = response.json()
+    
+    return {"betting_odds": data}
