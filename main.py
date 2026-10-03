@@ -174,3 +174,41 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
             
     db.commit()
     return {"status": "Sync Complete", "fixtures_processed": len(fixtures_data)}
+
+@app.get("/sync/mock-data")
+def create_mock_sa_matches(db: Session = Depends(get_db)):
+    # Clear old data first to keep it clean
+    db.query(CachedFixture).delete()
+    db.commit()
+
+    # Create 5 high-value SA matches
+    mock_matches = [
+        {"home": "Kaizer Chiefs", "away": "Orlando Pirates", "h_edge": 0.15},
+        {"home": "Mamelodi Sundowns", "away": "Stellenbosch FC", "h_edge": 0.12},
+        {"home": "Cape Town City", "away": "SuperSport United", "h_edge": 0.08},
+        {"home": "AmaZulu", "away": "Golden Arrows", "h_edge": 0.18},
+        {"home": "Sekhukhune United", "away": "Polokwane City", "h_edge": 0.10}
+    ]
+
+    for i, m in enumerate(mock_matches):
+        # We set the bookmaker odds HIGHER than the true odds to create value
+        true_odd = 2.00 
+        bookie_odd = true_odd * (1 + m["h_edge"]) # This creates the mathematical edge
+        
+        fixture = CachedFixture(
+            id=1000 + i, 
+            home_team=m["home"], 
+            away_team=m["away"], 
+            league_id=1,
+            true_home_odds=true_odd,
+            true_draw_odds=3.00,
+            true_away_odds=3.50,
+            bookmaker_home_odds=bookie_odd,
+            bookmaker_draw_odds=3.20,
+            bookmaker_away_odds=3.60,
+            max_value_edge=m["h_edge"] # This is the magic number that triggers the accumulator!
+        )
+        db.add(fixture)
+        
+    db.commit()
+    return {"status": "Mock Data Created", "matches_added": 5}
