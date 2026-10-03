@@ -167,15 +167,21 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
         date_str = item['fixture']['date'].replace('Z', '')
         dt_obj = datetime.fromisoformat(date_str)
         
-        existing = db.query(CachedFixture).filter(CachedFixture.id == f_id).first()
+      existing = db.query(CachedFixture).filter(CachedFixture.id == f_id).first()
         if not existing:
+            # Calculate the mathematical edge for the mock numbers
+            h_edge = (1.90 / 1.85) - 1
+            d_edge = (3.40 / 3.20) - 1
+            a_edge = (4.50 / 4.10) - 1
+            best_edge = max(h_edge, d_edge, a_edge)
+
             existing = CachedFixture(
                 id=f_id, home_team=home, away_team=away, match_date=dt_obj, league_id=int(league),
-                # TODO: Replace these mock numbers with your actual Poisson/Math Engine output
                 true_home_odds=1.85, true_draw_odds=3.20, true_away_odds=4.10,
-                bookmaker_home_odds=1.90, bookmaker_draw_odds=3.40, bookmaker_away_odds=4.50 
+                bookmaker_home_odds=1.90, bookmaker_draw_odds=3.40, bookmaker_away_odds=4.50,
+                max_value_edge=best_edge # This is the magic number!
             )
-            db.add(existing)
+            db.add(existing)  
             
     db.commit()
     return {"status": "Sync Complete", "fixtures_processed": len(fixtures_data)}
