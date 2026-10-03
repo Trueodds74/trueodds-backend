@@ -147,7 +147,7 @@ def generate_accumulator_slip(legs: int = 3, db: Session = Depends(get_db)):
         "legs": slip_items
     }
 
-@app.post("/sync/refresh-data")
+@app.get("/sync/refresh-data")
 def sync_external_data(league: str = "39", season: str = "2024", db: Session = Depends(get_db)):
     if not API_FOOTBALL_KEY or not ODDS_API_KEY:
         raise HTTPException(status_code=500, detail="API Access keys are unconfigured.")
