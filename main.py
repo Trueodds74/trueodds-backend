@@ -212,3 +212,12 @@ def create_mock_sa_matches(db: Session = Depends(get_db)):
         
     db.commit()
     return {"status": "Mock Data Created", "matches_added": 5}
+
+@app.get("/debug-db")
+def debug_database():
+    try:
+        db = SessionLocal()
+        count = db.query(CachedFixture).count()
+        return {"status": "SUCCESS", "rows": count}
+    except Exception as e:
+        return {"status": "FAILED", "error": str(e)}
