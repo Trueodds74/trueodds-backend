@@ -27,7 +27,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # 3. Database Model
 class CachedFixture(Base):
-    __tablename__ = "cached_fixtures"
+    __tablename__ = "cached_fixtures_v2"
     id = Column(Integer, primary_key=True, index=True)
     home_team = Column(String, index=True)
     away_team = Column(String, index=True)
