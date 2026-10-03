@@ -10,10 +10,10 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 app = FastAPI(
     title="TrueOdds Backend",
     version="2.1.0",
-    description="Optimized sports analytics backend with cached math validation and automated Accumulator engine."
+    description="Optimized sports analytics backend."
 )
 
-# 2. Database URL Setup & Verification
+# 2. Database Setup
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./test.db")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -25,28 +25,23 @@ engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# ==========================================
-# 3. Optimized Database Models (Caching Structure)
-# ==========================================
+# 3. Database Model
 class CachedFixture(Base):
     __tablename__ = "cached_fixtures"
-    id = Column(Integer, primary_key=True, index=True) # Matches API-Football ID
+    id = Column(Integer, primary_key=True, index=True)
     home_team = Column(String, index=True)
     away_team = Column(String, index=True)
     match_date = Column(DateTime)
     league_id = Column(Integer)
     
-    # Calculated True Probabilities (Decimal form)
     true_home_odds = Column(Float, nullable=True)
     true_draw_odds = Column(Float, nullable=True)
     true_away_odds = Column(Float, nullable=True)
     
-    # Real-world Bookmaker Odds cached locally
     bookmaker_home_odds = Column(Float, nullable=True)
-    bookmaker_draw_odds = Column(Float, nullable=True) # ADDED: Needed to evaluate Draw value
+    bookmaker_draw_odds = Column(Float, nullable=True)
     bookmaker_away_odds = Column(Float, nullable=True)
     
-    # Mathematical edge percentage
     max_value_edge = Column(Float, default=0.0)
 
 Base.metadata.create_all(bind=engine)
@@ -58,12 +53,10 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
-# ==========================================
-# 4. Endpoints & Value Logic
-# ==========================================
+# 4. Endpoints
 @app.get("/")
 def read_root():
-    return {"message": "TrueOdds Backend is Live and Optimized! 🚀", "version": "2.1.0"}
+    return {"message": "TrueOdds Backend is Live! 🚀", "version": "2.1.0"}
 
 @app.get("/dashboard/edges")
 def get_high_value_edges(db: Session = Depends(get_db)):
@@ -100,7 +93,6 @@ def generate_accumulator_slip(legs: int = 3, db: Session = Depends(get_db)):
     combined_true_odds = 1.0
     
     for match in top_legs:
-        # 1. Calculate edge for all 3 outcomes safely (prevents division by zero)
         edges = {}
         if match.true_home_odds and match.bookmaker_home_odds:
             edges["Home Win"] = (match.bookmaker_home_odds / match.true_home_odds) - 1
@@ -110,13 +102,11 @@ def generate_accumulator_slip(legs: int = 3, db: Session = Depends(get_db)):
             edges["Away Win"] = (match.bookmaker_away_odds / match.true_away_odds) - 1
             
         if not edges:
-            continue # Skip match if no valid odds exist
+            continue
             
-        # 2. Pick the outcome with the absolute highest mathematical edge
         best_selection = max(edges, key=edges.get)
         best_edge = edges[best_selection]
         
-        # 3. Get the corresponding odds for that best selection
         if best_selection == "Home Win":
             b_odds, t_odds = match.bookmaker_home_odds, match.true_home_odds
         elif best_selection == "Draw":
@@ -167,9 +157,8 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
         date_str = item['fixture']['date'].replace('Z', '')
         dt_obj = datetime.fromisoformat(date_str)
         
-      existing = db.query(CachedFixture).filter(CachedFixture.id == f_id).first()
+        existing = db.query(CachedFixture).filter(CachedFixture.id == f_id).first()
         if not existing:
-            # Calculate the mathematical edge for the mock numbers
             h_edge = (1.90 / 1.85) - 1
             d_edge = (3.40 / 3.20) - 1
             a_edge = (4.50 / 4.10) - 1
@@ -179,9 +168,9 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
                 id=f_id, home_team=home, away_team=away, match_date=dt_obj, league_id=int(league),
                 true_home_odds=1.85, true_draw_odds=3.20, true_away_odds=4.10,
                 bookmaker_home_odds=1.90, bookmaker_draw_odds=3.40, bookmaker_away_odds=4.50,
-                max_value_edge=best_edge # This is the magic number!
+                max_value_edge=best_edge
             )
-            db.add(existing)  
+            db.add(existing)
             
     db.commit()
     return {"status": "Sync Complete", "fixtures_processed": len(fixtures_data)}
