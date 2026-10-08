@@ -5,6 +5,7 @@ from typing import Generator
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from analytics import PoissonEngine
 
 # 1. Setup the App
 app = FastAPI(
@@ -186,42 +187,69 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
     db.commit()
     return {"status": "Sync Complete", "fixtures_processed": len(fixtures_data)}
 
-# Fixed Route Marker (@ added) & Fixed lowercase db.add variable assignment
 @app.get("/sync/mock-data")
 def create_mock_sa_matches(db: Session = Depends(get_db)):
     db.query(CachedFixture).delete()
     db.commit()
     
+    # 1. Add mock historic form data arrays to feed the Poisson calculation
     mock_matches = [
-        {"home": "Kaizer Chiefs", "away": "Orlando Pirates", "h_edge": 0.15},
-        {"home": "Mamelodi Sundowns", "away": "Stellenbosch FC", "h_edge": 0.12},
-        {"home": "Cape Town City", "away": "SuperSport United", "h_edge": 0.08},
-        {"home": "AmaZulu", "away": "Golden Arrows", "h_edge": 0.18},
-        {"home": "Sekhukhune United", "away": "Polokwane City", "h_edge": 0.10}
+        {
+            "home": "Kaizer Chiefs", "away": "Orlando Pirates", "h_edge": 0.15,
+            "home_stats": {"avg_goals_scored_home": 1.70, "avg_goals_conceded_home": 1.10},
+            "away_stats": {"avg_goals_scored_away": 1.40, "avg_goals_conceded_away": 0.95}
+        },
+        {
+            "home": "Mamelodi Sundowns", "away": "Stellenbosch FC", "h_edge": 0.12,
+            "home_stats": {"avg_goals_scored_home": 2.30, "avg_goals_conceded_home": 0.50},
+            "away_stats": {"avg_goals_scored_away": 1.50, "avg_goals_conceded_away": 1.10}
+        },
+        {
+            "home": "Cape Town City", "away": "SuperSport United", "h_edge": 0.08,
+            "home_stats": {"avg_goals_scored_home": 1.45, "avg_goals_conceded_home": 1.20},
+            "away_stats": {"avg_goals_scored_away": 1.20, "avg_goals_conceded_away": 1.30}
+        },
+        {
+            "home": "AmaZulu", "away": "Golden Arrows", "h_edge": 0.18,
+            "home_stats": {"avg_goals_scored_home": 1.10, "avg_goals_conceded_home": 1.40},
+            "away_stats": {"avg_goals_scored_away": 1.35, "avg_goals_conceded_away": 1.50}
+        },
+        {
+            "home": "Sekhukhune United", "away": "Polokwane City", "h_edge": 0.10,
+            "home_stats": {"avg_goals_scored_home": 1.30, "avg_goals_conceded_home": 1.00},
+            "away_stats": {"avg_goals_scored_away": 1.05, "avg_goals_conceded_away": 1.25}
+        }
     ]
     
+    # Static league benchmark defaults (Reflective of a standard competitive domestic season)
+    psl_averages = {"league_avg_home_scored": 1.35, "league_avg_away_scored": 1.05}
+    
     for i, m in enumerate(mock_matches):
-        true_odd = 2.00
-        bookie_odd = true_odd * (1 + m["h_edge"])
+        # 2. RUN THE REAL MATHEMATICAL CALCULATION LIVE!
+        t_home, t_draw, t_away = PoissonEngine.calculate_match_odds(
+            m["home_stats"], m["away_stats"], psl_averages
+        )
+        
+        # Factor in your requested edge discrepancies on top of calculated home wins
+        bookie_home_odd = round(t_home * (1 + m["h_edge"]), 2)
         
         fixture = CachedFixture(
             id=1000 + i,
             home_team=m["home"],
             away_team=m["away"],
             league_id=1,
-            true_home_odds=true_odd,
-            true_draw_odds=3.00,
-            true_away_odds=3.50,
-            bookmaker_home_odds=bookie_odd,
-            bookmaker_draw_odds=3.20,
-            bookmaker_away_odds=3.60,
+            true_home_odds=t_home,
+            true_draw_odds=t_draw,
+            true_away_odds=t_away,
+            bookmaker_home_odds=bookie_home_odd,
+            bookmaker_draw_odds=round(t_draw * 0.95, 2), # Simulated margin deductions
+            bookmaker_away_odds=round(t_away * 0.95, 2),
             max_value_edge=m["h_edge"]
         )
         db.add(fixture)
         
     db.commit()
-    return {"status": "Mock Data Created", "matches_added": 5}
-
+    return {"status": "Dynamic Mathematical Mock Data Created", "matches_added": 5}
 @app.get("/debug-db")
 def debug_database():
     try:
