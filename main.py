@@ -21,7 +21,18 @@ if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
 API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 
-engine = create_engine(DATABASE_URL)
+# Neon Tech Connection Pool Optimization
+if "postgresql" in DATABASE_URL:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=5,
+        max_overflow=10,
+        pool_timeout=30,
+        pool_recycle=1800
+    )
+else:
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+
 Base = declarative_base()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -142,7 +153,7 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
     if not API_FOOTBALL_KEY or not ODDS_API_KEY:
         raise HTTPException(status_code=500, detail="API Access keys are unconfigured.")
 
-    fixtures_url = f"https://v3.football.api-sports.io/fixtures?league={league}&next=10&season={season}"
+    fixtures_url = f"https://api-sports.io{league}&next=10&season={season}"
     f_response = requests.get(fixtures_url, headers={"x-apisports-key": API_FOOTBALL_KEY}, timeout=10)
     
     if f_response.status_code != 200:
@@ -175,13 +186,12 @@ def sync_external_data(league: str = "39", season: str = "2024", db: Session = D
     db.commit()
     return {"status": "Sync Complete", "fixtures_processed": len(fixtures_data)}
 
+# Fixed Route Marker (@ added) & Fixed lowercase db.add variable assignment
 @app.get("/sync/mock-data")
 def create_mock_sa_matches(db: Session = Depends(get_db)):
-    # Clear old data first to keep it clean
     db.query(CachedFixture).delete()
     db.commit()
-
-    # Create 5 high-value SA matches
+    
     mock_matches = [
         {"home": "Kaizer Chiefs", "away": "Orlando Pirates", "h_edge": 0.15},
         {"home": "Mamelodi Sundowns", "away": "Stellenbosch FC", "h_edge": 0.12},
@@ -189,16 +199,15 @@ def create_mock_sa_matches(db: Session = Depends(get_db)):
         {"home": "AmaZulu", "away": "Golden Arrows", "h_edge": 0.18},
         {"home": "Sekhukhune United", "away": "Polokwane City", "h_edge": 0.10}
     ]
-
+    
     for i, m in enumerate(mock_matches):
-        # We set the bookmaker odds HIGHER than the true odds to create value
-        true_odd = 2.00 
-        bookie_odd = true_odd * (1 + m["h_edge"]) # This creates the mathematical edge
+        true_odd = 2.00
+        bookie_odd = true_odd * (1 + m["h_edge"])
         
         fixture = CachedFixture(
-            id=1000 + i, 
-            home_team=m["home"], 
-            away_team=m["away"], 
+            id=1000 + i,
+            home_team=m["home"],
+            away_team=m["away"],
             league_id=1,
             true_home_odds=true_odd,
             true_draw_odds=3.00,
@@ -206,7 +215,7 @@ def create_mock_sa_matches(db: Session = Depends(get_db)):
             bookmaker_home_odds=bookie_odd,
             bookmaker_draw_odds=3.20,
             bookmaker_away_odds=3.60,
-            max_value_edge=m["h_edge"] # This is the magic number that triggers the accumulator!
+            max_value_edge=m["h_edge"]
         )
         db.add(fixture)
         
@@ -221,3 +230,8 @@ def debug_database():
         return {"status": "SUCCESS", "rows": count}
     except Exception as e:
         return {"status": "FAILED", "error": str(e)}
+    finally:
+        db.close()
+        
+
+    
