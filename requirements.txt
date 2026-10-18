@@ -4,3 +4,7 @@ requests
 sqlalchemy
 psycopg[binary]
 python-dotenv
+uvicorn[standard]
+psycopg2-binary
+python-dotenv
+gunicorn

@@ -1,0 +1,7 @@
+venv/
+.env
+__pycache__/
+*.pyc
+.git/
+test_db.py
+.DS_Store
