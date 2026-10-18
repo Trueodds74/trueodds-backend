@@ -21,3 +21,6 @@ COPY . .
 EXPOSE 8000
 
 # Start the app using Uvicorn
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
