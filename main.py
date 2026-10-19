@@ -159,7 +159,7 @@ fixtures_url = "https://v3.football.api-sports.io/fixtures"
             "next": 10,
             "season": season
         }
-        
+
         f_response = requests.get(
             fixtures_url, 
             headers={"x-apisports-key": API_FOOTBALL_KEY}, 
@@ -169,9 +169,8 @@ fixtures_url = "https://v3.football.api-sports.io/fixtures"
     
     if f_response.status_code != 200:
         return {"status": "error", "message": "Failed to pull fixtures"}
-        
-    fixtures_data = f_response.json().get('response', [])
-    
+
+    fixtures_data = f_response.json().get('response', [])    
     for item in fixtures_data:
         f_id = item['fixture']['id']
         home = item['teams']['home']['name']
