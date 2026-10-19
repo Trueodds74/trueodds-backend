@@ -153,9 +153,13 @@ def generate_accumulator_slip(legs: int = 3, db: Session = Depends(get_db)):
 def sync_external_data(league: str = "39", season: str = "2024", db: Session = Depends(get_db)):
     if not API_FOOTBALL_KEY or not ODDS_API_KEY:
         raise HTTPException(status_code=500, detail="API Access keys are unconfigured.")
-
-    fixtures_url = f"https://api-sports.io{league}&next=10&season={season}"
-    f_response = requests.get(fixtures_url, headers={"x-apisports-key": API_FOOTBALL_KEY}, timeout=10)
+    fixtures_url = "https://v3.football.api-sports.io/fixtures"
+    params = {
+       "league": league,
+       "next": 10,
+       "season": season
+   }
+   f_response = requests.get(fixtures_url, headers={"x-apisports-key": API_FOOTBALL_KEY}, params=params, timeout=10)
     
     if f_response.status_code != 200:
         return {"status": "error", "message": "Failed to pull fixtures"}
