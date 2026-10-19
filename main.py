@@ -69,52 +69,47 @@ def get_db() -> Generator[Session, None, None]:
 @app.get("/")
 def read_root():
     return {"message": "TrueOdds Backend is Live! 🚀", "version": "2.1.0"}
-
 @app.get("/dashboard/edges")
 def get_edges(db: Session = Depends(get_db)):
-    # 1. Fetch all cached fixtures from the database
     fixtures = db.query(CachedFixture).all()
-    
     matches = []
     
     for f in fixtures:
-        # 2. Calculate the edge for each outcome (Home, Draw, Away)
-        # Edge formula: (Bookie Odds / True Odds) - 1
-        home_edge = ((f.bookmaker_home_odd / f.true_home_odds) - 1) * 100
-        draw_edge = ((f.bookmaker_draw_odd / f.true_draw_odds) - 1) * 100
-        away_edge = ((f.bookmaker_away_odd / f.true_away_odds) - 1) * 100
+        # Use the correct plural column names from your database
+        home_edge = ((f.bookmaker_home_odds / f.true_home_odds) - 1) * 100
+        draw_edge = ((f.bookmaker_draw_odds / f.true_draw_odds) - 1) * 100
+        away_edge = ((f.bookmaker_away_odds / f.true_away_odds) - 1) * 100
         
-        # 3. Find the best edge
         edges = {"Home": home_edge, "Draw": draw_edge, "Away": away_edge}
         best_outcome = max(edges, key=edges.get)
         best_edge = edges[best_outcome]
         
-        # Only show it if there is a positive edge (Value Bet)
         if best_edge > 0:
-            # 4. Generate the "One-Line Reason" for the scanner
             if best_outcome == "Home":
-                reason = f"Model values {f.home_team} win at {round(100/f.true_home_odds, 1)}%, but bookies offer {f.bookmaker_home_odd}."
+                reason = f"Model values {f.home_team} win at {round(100/f.true_home_odds, 1)}%, but bookies offer {f.bookmaker_home_odds}."
+                best_odd = f.bookmaker_home_odds
             elif best_outcome == "Draw":
-                reason = f"Model sees a {round(100/f.true_draw_odds, 1)}% chance of a draw, bookies are paying {f.bookmaker_draw_odd}."
+                reason = f"Model sees a {round(100/f.true_draw_odds, 1)}% chance of a draw, bookies are paying {f.bookmaker_draw_odds}."
+                best_odd = f.bookmaker_draw_odds
             else:
-                reason = f"Model values {f.away_team} win at {round(100/f.true_away_odds, 1)}%, bookies offer {f.bookmaker_away_odd}."
+                reason = f"Model values {f.away_team} win at {round(100/f.true_away_odds, 1)}%, bookies offer {f.bookmaker_away_odds}."
+                best_odd = f.bookmaker_away_odds
 
             matches.append({
                 "fixture_id": f.id,
                 "match": f"{f.home_team} vs {f.away_team}",
                 "best_bet": f"{best_outcome} Win",
-                "bookmaker_odd": f.bookmaker_home_odd if best_outcome == "Home" else (f.bookmaker_draw_odd if best_outcome == "Draw" else f.bookmaker_away_odd),
+                "bookmaker_odd": best_odd,
                 "punter_edge_percentage": f"{round(best_edge, 1)}%",
                 "reason": reason
             })
 
-    # Sort by highest edge
     matches.sort(key=lambda x: float(x["punter_edge_percentage"].replace('%', '')), reverse=True)
 
     return {
         "status": "success",
         "total_value_opportunities": len(matches),
-        "matches": matches[:10] # Limit to top 10 for the scanner
+        "matches": matches[:10]
     }
 
 @app.get("/accumulator/smart-slip")
