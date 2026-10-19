@@ -69,42 +69,51 @@ def get_db() -> Generator[Session, None, None]:
 @app.get("/")
 def read_root():
     return {"message": "TrueOdds Backend is Live! 🚀", "version": "2.1.0"}
+
 @app.get("/dashboard/edges")
 def get_edges(db: Session = Depends(get_db)):
     fixtures = db.query(CachedFixture).all()
     matches = []
     
     for f in fixtures:
-        # Use the correct plural column names from your database
-        home_edge = ((f.bookmaker_home_odds / f.true_home_odds) - 1) * 100
-        draw_edge = ((f.bookmaker_draw_odds / f.true_draw_odds) - 1) * 100
-        away_edge = ((f.bookmaker_away_odds / f.true_away_odds) - 1) * 100
+        # Calculate EV for all three outcomes
+        home_ev = ((f.bookmaker_home_odds / f.true_home_odds) - 1) * 100
+        draw_ev = ((f.bookmaker_draw_odds / f.true_draw_odds) - 1) * 100
+        away_ev = ((f.bookmaker_away_odds / f.true_away_odds) - 1) * 100
         
-        edges = {"Home": home_edge, "Draw": draw_edge, "Away": away_edge}
+        edges = {"Home": home_ev, "Draw": draw_ev, "Away": away_ev}
         best_outcome = max(edges, key=edges.get)
-        best_edge = edges[best_outcome]
+        best_ev = edges[best_outcome]
         
-        if best_edge > 0:
+        # Only show positive Expected Value
+        if best_ev > 0:
             if best_outcome == "Home":
-                reason = f"Model values {f.home_team} win at {round(100/f.true_home_odds, 1)}%, but bookies offer {f.bookmaker_home_odds}."
-                best_odd = f.bookmaker_home_odds
+                fair_odd = f.true_home_odds
+                bookie_odd = f.bookmaker_home_odds
+                model_prob = round(100 / fair_odd, 1)
+                reason = f"Model implies {model_prob}% chance (fair odds {fair_odd}), but bookies offer {bookie_odd}. This creates a {round(best_ev, 1)}% Expected Value (EV)."
             elif best_outcome == "Draw":
-                reason = f"Model sees a {round(100/f.true_draw_odds, 1)}% chance of a draw, bookies are paying {f.bookmaker_draw_odds}."
-                best_odd = f.bookmaker_draw_odds
+                fair_odd = f.true_draw_odds
+                bookie_odd = f.bookmaker_draw_odds
+                model_prob = round(100 / fair_odd, 1)
+                reason = f"Model implies {model_prob}% chance of a draw (fair odds {fair_odd}), but bookies are paying {bookie_odd}. This creates a {round(best_ev, 1)}% Expected Value (EV)."
             else:
-                reason = f"Model values {f.away_team} win at {round(100/f.true_away_odds, 1)}%, bookies offer {f.bookmaker_away_odds}."
-                best_odd = f.bookmaker_away_odds
+                fair_odd = f.true_away_odds
+                bookie_odd = f.bookmaker_away_odds
+                model_prob = round(100 / fair_odd, 1)
+                reason = f"Model implies {model_prob}% chance (fair odds {fair_odd}), but bookies offer {bookie_odd}. This creates a {round(best_ev, 1)}% Expected Value (EV)."
 
             matches.append({
                 "fixture_id": f.id,
                 "match": f"{f.home_team} vs {f.away_team}",
                 "best_bet": f"{best_outcome} Win",
-                "bookmaker_odd": best_odd,
-                "punter_edge_percentage": f"{round(best_edge, 1)}%",
+                "bookmaker_odd": bookie_odd,
+                "expected_value_ev": f"{round(best_ev, 1)}%", # Renamed for clarity
                 "reason": reason
             })
 
-    matches.sort(key=lambda x: float(x["punter_edge_percentage"].replace('%', '')), reverse=True)
+    # Sort by highest Expected Value
+    matches.sort(key=lambda x: float(x["expected_value_ev"].replace('%', '')), reverse=True)
 
     return {
         "status": "success",
