@@ -1,0 +1,14 @@
+# secrets
+.env
+.env.*
+
+# python toolbox and compiled leftovers
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# local databases and tools
+*.db
+*.sqlite3
+*.jar
