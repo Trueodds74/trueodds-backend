@@ -353,6 +353,26 @@ def admin_set_prices(fixture_id: int, body: PriceIn, db: Session = Depends(get_d
     return {"status": "saved", "fixture_id": fixture_id, "bookmaker": body.bookmaker.strip()}
 
 
+@admin.get("/status")
+def admin_status(db: Session = Depends(get_db)):
+    """What this running app can see right now. Use it to check which database
+    it is reading and whether the practice matches are still upcoming."""
+    now = utcnow()
+    upcoming_mock = (db.query(Fixture)
+                     .filter(Fixture.is_mock.is_(True), Fixture.kickoff > now)
+                     .order_by(Fixture.kickoff).all())
+    return {
+        "server_time_utc": now.isoformat(),
+        "database_type": engine.url.get_backend_name(),
+        "fixtures_real": db.query(Fixture).filter(Fixture.is_mock.is_(False)).count(),
+        "fixtures_mock": db.query(Fixture).filter(Fixture.is_mock.is_(True)).count(),
+        "mock_fixtures_still_upcoming": len(upcoming_mock),
+        "next_mock_kickoff_utc": upcoming_mock[0].kickoff.isoformat() if upcoming_mock else None,
+        "prices_saved": db.query(Price).count(),
+        "picks_logged": db.query(PickLog).count(),
+    }
+
+
 @admin.get("/preview")
 def admin_preview(include_mock: bool = False, hours: float = Query(24, gt=0, le=72),
                   db: Session = Depends(get_db)):

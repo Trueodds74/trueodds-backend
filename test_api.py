@@ -193,3 +193,21 @@ def test_daily_cap_is_four(client):
 def test_old_dashboard_endpoint_still_works(client):
     data = client.get("/dashboard/edges").json()
     assert data["status"] == "success" and data["matches"] == []
+
+
+def test_status_shows_what_the_app_sees(client):
+    assert client.get("/admin/status").status_code == 401
+    empty = client.get("/admin/status", headers=KEY).json()
+    assert empty["fixtures_mock"] == 0 and empty["prices_saved"] == 0
+    client.post("/admin/mock-data", headers=KEY)
+    full = client.get("/admin/status", headers=KEY).json()
+    assert full["fixtures_mock"] == 5 and full["fixtures_real"] == 0
+    assert full["mock_fixtures_still_upcoming"] == 5 and full["prices_saved"] == 5
+
+
+def test_mock_preview_shows_picks_and_a_held_one(client):
+    client.post("/admin/mock-data", headers=KEY)
+    preview = client.get("/admin/preview?include_mock=true", headers=KEY).json()
+    assert len(preview["would_publish"]) >= 2
+    assert len(preview["held_for_review_edge_over_15pct"]) >= 1
+    assert client.get("/admin/preview", headers=KEY).json()["would_publish"] == []
